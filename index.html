@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>IcedWaters Notes</title>
+
+<link rel="icon" type="image/png" href="favicon.png">
+
+<style>
+    html {
+        overflow-x: hidden;
+    }
+
+    body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        background: linear-gradient(180deg, #0a1a33, #000000);
+        color: white;
+        overflow-x: hidden;
+        padding: 20px;
+        min-height: 100vh;
+    }
+
+    #backHome {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background: #1e3a5f;
+        padding: 10px 16px;
+        border-radius: 6px;
+        color: white;
+        text-decoration: none;
+    }
+    #backHome:hover {
+        background: #2a4f80;
+    }
+
+    h1 {
+        text-align: center;
+        margin-bottom: 5px;
+    }
+
+    h2 {
+        text-align: center;
+        margin-top: 0;
+        margin-bottom: 20px;
+        font-weight: normal;
+        color: #bcd4ff;
+    }
+
+    #noteBox {
+        width: 100%;
+        height: 22vh;
+        background: #0d1f3a;
+        border: 2px solid #1e3a5f;
+        border-radius: 6px;
+        padding: 10px;
+        color: white;
+        resize: none;
+        outline: none;
+        font-size: 18px;
+        margin-bottom: 15px;
+        line-height: 1.4;
+        font-family: system-ui, sans-serif;
+    }
+
+    #monoToggle, #saveBtn, #exportBtn, #exportAsBtn, #importBtn, #donateBtn {
+        background: #1e3a5f;
+        padding: 10px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+        display: inline-block;
+        margin-right: 10px;
+        margin-bottom: 20px;
+    }
+    #monoToggle:hover, #saveBtn:hover, #exportBtn:hover, #exportAsBtn:hover, #importBtn:hover, #donateBtn:hover {
+        background: #2a4f80;
+    }
+
+    .noteItem {
+        background: #0d1f3a;
+        padding: 12px;
+        margin: 10px 0;
+        border-radius: 6px;
+        border: 2px solid #1e3a5f;
+        font-size: 18px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: border-color 0.2s ease;
+    }
+
+    .selectedNote {
+        border-color: #4da3ff !important;
+        box-shadow: 0 0 8px #4da3ff;
+    }
+
+    .noteTitle {
+        cursor: pointer;
+        flex-grow: 1;
+    }
+
+    .arrows {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .arrowBtn, .deleteBtn {
+        cursor: pointer;
+        font-size: 20px;
+        user-select: none;
+    }
+
+    .arrowBtn:hover, .deleteBtn:hover {
+        color: #bcd4ff;
+    }
+
+    #importFile {
+        display: none;
+    }
+</style>
+
+</head>
+<body>
+
+<a id="backHome" href="/">Back to Home</a>
+
+<h1>IcedWaters Notes</h1>
+<h2>A local storage, ad-free notetaking app. We only track user web traffic, all your notes are private and offline.</h2>
+
+<textarea id="noteBox" placeholder="Write a new note..."></textarea>
+
+<div id="monoToggle" onclick="toggleMonospace()">Monospace: OFF</div>
+<div id="saveBtn" onclick="saveNote()">Save Note</div>
+<div id="exportBtn" onclick="exportNotes()">Export Notes</div>
+<div id="exportAsBtn" onclick="exportAs()">Export As...</div>
+<div id="importBtn" onclick="document.getElementById('importFile').click()">Import Notes</div>
+<div id="donateBtn" onclick="window.location.href='about:blank'">Consider Donating</div>
+
+<input type="file" id="importFile" accept="text/*" onchange="importNotes(event)">
+
+<div id="notesList"></div>
+
+<script>
+// Allowed export extensions
+const allowedExtensions = [
+    "txt", "md", "json", "html", "css", "js", "xml", "csv", "yaml", "yml",
+    "ini", "cfg", "sh", "bat", "ps1", "java", "py", "c", "cpp", "cs", "php",
+    "rb", "go", "rs", "tex", "srt", "log", "properties"
+];
+
+// Load notes safely
+let stored = JSON.parse(localStorage.getItem("iw_notes") || "[]");
+let notes = Array.isArray(stored) ? stored : Object.values(stored);
+
+let editingIndex = null;
+let selectedIndex = null;
+
+// Load monospace state
+let monoState = localStorage.getItem("iw_mono") === "true";
+applyMonospace();
+
+// Extract first line as title
+function getTitle(text) {
+    if (!text) return "(empty note)";
+    return text.split("\n")[0].trim() || "(untitled)";
+}
+
+function refreshList() {
+    const list = document.getElementById("notesList");
+    list.innerHTML = "";
+
+    notes.forEach((note, index) => {
+        const div = document.createElement("div");
+        div.className = "noteItem";
+        if (index === selectedIndex) div.classList.add("selectedNote");
+
+        const title = document.createElement("div");
+        title.className = "noteTitle";
+        title.textContent = getTitle(note);
+        title.onclick = () => selectNote(index);
+
+        const arrows = document.createElement("div");
+        arrows.className = "arrows";
+
+        const up = document.createElement("div");
+        up.className = "arrowBtn";
+        up.textContent = "▲";
+        up.onclick = () => moveUp(index);
+
+        const down = document.createElement("div");
+        down.className = "arrowBtn";
+        down.textContent = "▼";
+        down.onclick = () => moveDown(index);
+
+        const del = document.createElement("div");
+        del.className = "deleteBtn";
+        del.textContent = "🗑️";
+        del.onclick = () => deleteNote(index);
+
+        arrows.appendChild(up);
+        arrows.appendChild(down);
+        arrows.appendChild(del);
+
+        div.appendChild(title);
+        div.appendChild(arrows);
+        list.appendChild(div);
+    });
+}
+
+function selectNote(index) {
+    if (selectedIndex === index) {
+        selectedIndex = null;
+        editingIndex = null;
+        document.getElementById("noteBox").value = "";
+    } else {
+        selectedIndex = index;
+        editingIndex = index;
+        document.getElementById("noteBox").value = notes[index];
+    }
+    refreshList();
+}
+
+function saveNote() {
+    const text = document.getElementById("noteBox").value.trim();
+    if (text === "") return;
+
+    if (editingIndex === null) {
+        notes.push(text);
+    } else {
+        notes[editingIndex] = text;
+    }
+
+    localStorage.setItem("iw_notes", JSON.stringify(notes));
+
+    document.getElementById("noteBox").value = "";
+    editingIndex = null;
+    selectedIndex = null;
+
+    refreshList();
+}
+
+function moveUp(index) {
+    if (index === 0) return;
+    [notes[index - 1], notes[index]] = [notes[index], notes[index - 1]];
+    if (selectedIndex === index) selectedIndex = index - 1;
+    localStorage.setItem("iw_notes", JSON.stringify(notes));
+    refreshList();
+}
+
+function moveDown(index) {
+    if (index === notes.length - 1) return;
+    [notes[index + 1], notes[index]] = [notes[index], notes[index + 1]];
+    if (selectedIndex === index) selectedIndex = index + 1;
+    localStorage.setItem("iw_notes", JSON.stringify(notes));
+    refreshList();
+}
+
+function deleteNote(index) {
+    if (!confirm("Delete this note?")) return;
+
+    notes.splice(index, 1);
+
+    if (selectedIndex === index) {
+        selectedIndex = null;
+        editingIndex = null;
+        document.getElementById("noteBox").value = "";
+    } else if (selectedIndex > index) {
+        selectedIndex--;
+    }
+
+    localStorage.setItem("iw_notes", JSON.stringify(notes));
+    refreshList();
+}
+
+// EXPORT NOTES (default .txt)
+function exportNotes() {
+    if (notes.length === 0) {
+        alert("There's no notes to export.");
+        return;
+    }
+
+    if (selectedIndex !== null) {
+        exportSingle(selectedIndex);
+        return;
+    }
+
+    if (confirm("No note selected. Export all notes instead?")) {
+        exportAll();
+    }
+}
+
+function exportSingle(index) {
+    let firstLine = getTitle(notes[index]);
+    firstLine = firstLine.replace(/[^a-z0-9_\- ]/gi, "").trim();
+    if (firstLine === "") firstLine = "Note";
+
+    const filename = firstLine + ".txt";
+    const blob = new Blob([notes[index]], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+
+    URL.revokeObjectURL(url);
+}
+
+function exportAll() {
+    notes.forEach((note, i) => {
+        let title = getTitle(note).replace(/[^a-z0-9_\- ]/gi, "").trim();
+        if (title === "") title = "Note";
+
+        const filename = `${i + 1} - ${title}.txt`;
+
+        const blob = new Blob([note], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        a.click();
+
+        URL.revokeObjectURL(url);
+    });
+}
+
+// EXPORT AS...
+function exportAs() {
+    if (notes.length === 0) {
+        alert("There are no notes to export.");
+        return;
+    }
+
+    let ext = prompt(
+        "Enter a file extension (without the dot):\n\n" +
+        allowedExtensions.join(", ")
+    );
+
+    if (!ext) return;
+    ext = ext.toLowerCase().trim();
+
+    // Easter egg: typing "secret" downloads /secret.zip
+	if (ext === "secret") {
+    	const a = document.createElement("a");
+	    a.href = "https://1drv.ms/u/c/8aefe2b2be4b3ef6/IQSsYWYkuhv4Q7MQqmpP0RgGAWg2NCiiRe8KzJuMvOr6enA";
+	    a.click();
+    	return;
+	}
+
+if (!allowedExtensions.includes(ext)) {
+    alert("Unsupported file type.");
+    return;
+}
+
+
+    if (selectedIndex !== null) {
+        exportSingleAs(selectedIndex, ext);
+    } else {
+        if (confirm("No note selected. Export all notes instead?")) {
+            exportAllAs(ext);
+        }
+    }
+}
+
+function exportSingleAs(index, ext) {
+    let title = getTitle(notes[index]).replace(/[^a-z0-9_\- ]/gi, "").trim();
+    if (title === "") title = "Note";
+
+    const filename = `${title}.${ext}`;
+    const blob = new Blob([notes[index]], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+
+    URL.revokeObjectURL(url);
+}
+
+function exportAllAs(ext) {
+    notes.forEach((note, i) => {
+        let title = getTitle(note).replace(/[^a-z0-9_\- ]/gi, "").trim();
+        if (title === "") title = "Note";
+
+        const filename = `${i + 1} - ${title}.${ext}`;
+        const blob = new Blob([note], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        a.click();
+
+        URL.revokeObjectURL(url);
+    });
+}
+
+// IMPORT NOTES
+function importNotes(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const text = e.target.result;
+        const imported = text
+            .split("----- NOTE BREAK -----")
+            .map(n => n.trim())
+            .filter(n => n.length > 0);
+
+        notes = notes.concat(imported);
+        localStorage.setItem("iw_notes", JSON.stringify(notes));
+        refreshList();
+    };
+    reader.readAsText(file);
+
+    event.target.value = "";
+}
+
+// MONOSPACE TOGGLE
+function toggleMonospace() {
+    monoState = !monoState;
+    localStorage.setItem("iw_mono", monoState);
+    applyMonospace();
+}
+
+function applyMonospace() {
+    const box = document.getElementById("noteBox");
+    const toggle = document.getElementById("monoToggle");
+
+    if (monoState) {
+        box.style.fontFamily = "Consolas, 'Courier New', monospace";
+        box.style.lineHeight = "1.1";
+        toggle.textContent = "Monospaces: ON";
+    } else {
+        box.style.fontFamily = "system-ui, sans-serif";
+        box.style.lineHeight = "1.4";
+        toggle.textContent = "Monospace: OFF";
+    }
+}
+
+refreshList();
+</script>
+
+</body>
+</html>
