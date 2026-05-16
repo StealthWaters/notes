@@ -6,6 +6,13 @@
 
 <link rel="icon" type="image/png" href="favicon.png">
 
+<meta property="og:locale" content="en-US" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="IcedWaters Notes - A simple text editor and notes app." />
+<meta property="og:description" content="A simple, free notetaking app. Supports all text file extensions." />
+<meta property="og:image" content="favicon.png" />
+<meta name="keywords" content="notes, note, notetaking, editor, text, texteditor">
+    
 <style>
     html {
         overflow-x: hidden;
@@ -124,10 +131,10 @@
 </head>
 <body>
 
-<a id="backHome" href="/">Back to Home</a>
+<a id="backHome" href="https://icedwaters.com">Back to Home</a>
 
 <h1>IcedWaters Notes</h1>
-<h2>A local storage, ad-free notetaking app. We only track user web traffic, all your notes are private and offline.</h2>
+<h2>A local storage, ad-free notetaking app. No trackers whatsoever.</h2>
 
 <textarea id="noteBox" placeholder="Write a new note..."></textarea>
 
@@ -145,7 +152,7 @@
 <script>
 // Allowed export extensions
 const allowedExtensions = [
-    "txt", "md", "json", "html", "css", "js", "xml", "csv", "yaml", "yml",
+    "txt", "md", "mdx", "astro", "svg" "json", "html", "css", "js", "xml", "csv", "yaml", "yml",
     "ini", "cfg", "sh", "bat", "ps1", "java", "py", "c", "cpp", "cs", "php",
     "rb", "go", "rs", "tex", "srt", "log", "properties"
 ];
